@@ -1,9 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"sync/atomic"
 )
 
@@ -21,12 +22,18 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	count := cfg.fsHit.Load()
 
-	s := "Hits: " + strconv.FormatInt(int64(count), 10)
+	s := fmt.Sprintf(
+		`<html>
+			<body>
+				<h1>Welcome, Chirpy Admin</h1>
+				<p>Chirpy has been visited %d times!</p>
+			</body>
+		</html>`, count)
 	data := []byte(s)
 
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, err := w.Write([]byte(data))
+	_, err := w.Write(data)
 	if err != nil {
 		log.Printf("error writing response: %v", err)
 	}
@@ -49,16 +56,18 @@ func main() {
 	fs := http.FileServer(http.Dir(filePathRoot))
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", fs)))
 
-	mux.HandleFunc("GET /healthz", handlerHealthz)
-	mux.HandleFunc("GET /metrics", apiCfg.handlerMetrics)
-	mux.HandleFunc("POST /reset", apiCfg.handlerReset)
+	mux.HandleFunc("GET /api/healthz", handlerHealthz)
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
 
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
 	}
 
-	log.Printf("Starting server on port: %s\n", port)
+	log.Printf("Starting server on port: %v\n", port)
 	log.Fatal(server.ListenAndServe())
 }
 
@@ -67,5 +76,66 @@ func handlerHealthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte(http.StatusText(http.StatusOK))); err != nil {
 		log.Printf("Error writing response: %v", err)
+	}
+}
+
+func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
+	type request struct {
+		Body string `json:"body"`
+	}
+	
+	decoder := json.NewDecoder(r.Body)
+	req := request{}
+	err := decoder.Decode(&req)
+	if err != nil {
+		log.Printf("error reading body: %v", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	length := len(req.Body)
+	if length > 140 {
+		sendError(400, "Chirp is too long", w)
+		return;
+	}
+
+	respBody := struct {
+		Valid bool `json:"valid"`
+	}{Valid: true}
+	data, err := json.Marshal(respBody)
+	if err != nil {
+		log.Printf("error when marshalling response: %v", err)
+		w.WriteHeader(500)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err = w.Write(data)
+	if err != nil {
+		log.Printf("error when marshalling response: %v", err)
+		w.WriteHeader(500)
+	}
+}
+
+func sendError(code int, message string, w http.ResponseWriter) {
+	type respJson struct {
+		Error string `json:"error"`
+	}
+	respBody := respJson{
+		Error: message,
+	}
+	data, err := json.Marshal(respBody)
+	if err != nil {
+		log.Printf("error when marshalling response: %v", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_, err = w.Write(data)
+	if err != nil {
+		log.Printf("error when marshalling response: %v", err)
+		return
 	}
 }
