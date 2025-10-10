@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync/atomic"
 )
 
@@ -89,35 +90,29 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&req)
 	if err != nil {
 		log.Printf("error reading body: %v", err)
-		w.WriteHeader(500)
 		return
 	}
 
 	length := len(req.Body)
 	if length > 140 {
-		sendError(400, "Chirp is too long", w)
+		sendError(w, 400, "Chirp is too long")
 		return;
 	}
 
+	words := strings.Split(req.Body, " ")
+	for i, word := range words{
+		if strings.ToLower(word) == "kerfuffle" || strings.ToLower(word) == "sharbert" || strings.ToLower(word) == "formax" {
+			words[i] = "****"
+		}
+	}
+
 	respBody := struct {
-		Valid bool `json:"valid"`
-	}{Valid: true}
-	data, err := json.Marshal(respBody)
-	if err != nil {
-		log.Printf("error when marshalling response: %v", err)
-		w.WriteHeader(500)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err = w.Write(data)
-	if err != nil {
-		log.Printf("error when marshalling response: %v", err)
-		w.WriteHeader(500)
-	}
+		CleanedBody string `json:"cleaned_body"`
+	}{CleanedBody: strings.Join(words, " ")}
+	sendJSON(w, 200, respBody)
 }
 
-func sendError(code int, message string, w http.ResponseWriter) {
+func sendError(w http.ResponseWriter, code int, message string) {
 	type respJson struct {
 		Error string `json:"error"`
 	}
@@ -127,10 +122,24 @@ func sendError(code int, message string, w http.ResponseWriter) {
 	data, err := json.Marshal(respBody)
 	if err != nil {
 		log.Printf("error when marshalling response: %v", err)
-		w.WriteHeader(500)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_, err = w.Write(data)
+	if err != nil {
+		log.Printf("error when marshalling response: %v", err)
+		return
+	}
+}
+
+func sendJSON(w http.ResponseWriter, code int, payload any) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("error when marshalling response: %v", err)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_, err = w.Write(data)
