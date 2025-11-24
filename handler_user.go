@@ -36,11 +36,5 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseUser := User{
-		ID: user.ID,
-		Email: user.Email,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-	sendJSON(w, 201, responseUser)
+	sendJSON(w, 201, user)
 }

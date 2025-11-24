@@ -57,12 +57,15 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	respChirp := Chirp{
-		ID: chirp.ID,
-		UserID: chirp.UserID,
-		Body: chirp.Body,
-		CreatedAt: chirp.CreatedAt,
-		UpdatedAt: chirp.UpdatedAt,
+	sendJSON(w, 201, chirp)
+}
+
+func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, err := cfg.db.GetChirps(r.Context())
+	if err != nil {
+		log.Printf("error retrieving chirps: %v", err)
+		return
 	}
-	sendJSON(w, 200, respChirp)
+
+	sendJSON(w, 200, chirps)
 }
