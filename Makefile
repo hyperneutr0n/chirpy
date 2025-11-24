@@ -15,7 +15,11 @@ query:
 	cd sql/queries && touch $(name)
 
 migrate:
-	cd sql/schema && goose postgres "postgres://postgres:changeme@localhost:5432/chirpy" up
+	@if [ -z "$(direction)" ]; then \
+		echo "Error: need migrate direction when migrating"; \
+		exit 1; \
+	fi
+	cd sql/schema && goose postgres "postgres://postgres:changeme@localhost:5432/chirpy" $(direction)
 
 generate:
 	sqlc generate
