@@ -1,23 +1,16 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/hyperneutr0n/chirpy/internal/database"
 )
-
-type Chirp struct {
-	ID        uuid.UUID `json:"id"`
-	UserID    uuid.UUID `json:"user_id"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
 
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	type request struct {
@@ -48,12 +41,13 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	}
 
 	newChirp := database.CreateChirpParams{
-		Body: strings.Join(words, " "),
+		Body:   strings.Join(words, " "),
 		UserID: req.UserID,
 	}
 	chirp, err := cfg.db.CreateChirp(r.Context(), newChirp)
 	if err != nil {
 		log.Printf("failed creating chirp: %v", err)
+		sendError(w, 500, "Failed creating chirp")
 		return
 	}
 
@@ -64,8 +58,32 @@ func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 	chirps, err := cfg.db.GetChirps(r.Context())
 	if err != nil {
 		log.Printf("error retrieving chirps: %v", err)
+		sendError(w, 500, "Failed retrieving chirps")
 		return
 	}
 
 	sendJSON(w, 200, chirps)
+}
+
+func (cfg *apiConfig) handlerFindChirp(w http.ResponseWriter, r *http.Request) {
+	chirpID := r.PathValue("chirpID")
+	_chirpID, err := uuid.Parse(chirpID)
+	if err != nil {
+		log.Printf("failed parsing uuid: %v", err)
+		sendError(w, 400, "Invalid chirp ID")
+		return
+	}
+
+	chirp, err := cfg.db.FindChirp(r.Context(), _chirpID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			sendError(w, 404, "Chirp not found")
+			return
+		}
+		log.Printf("failed finding chirp: %v", err)
+		sendError(w, 500, "Internal server error")
+		return
+	}
+
+	sendJSON(w, 200, chirp)
 }

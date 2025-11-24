@@ -4,17 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
-
-	"github.com/google/uuid"
 )
-
-type User struct {
-	ID			uuid.UUID	`json:"id"`
-	Email		string		`json:"email"`
-	CreatedAt	time.Time	`json:"created_at"`
-	UpdatedAt	time.Time	`json:"updated_at"`
-}
 
 func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 	type request struct {
@@ -26,6 +16,7 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&req)
 	if err != nil {
 		log.Printf("error reading body: %v", err)
+		sendError(w, 400, "Invalid request body")
 		return
 	}
 

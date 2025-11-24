@@ -35,6 +35,8 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 
 		if err != nil {
 			log.Printf("error resetting user: %v", err)
+			sendError(w, 500, "Failed to reset users")
+			return
 		}
 	}
 
