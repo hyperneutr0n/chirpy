@@ -1,9 +1,20 @@
 -- name: CreateUser :one
-INSERT INTO users (email)
+INSERT INTO users (email, password)
 VALUES (
-    $1
+    $1,
+    $2
 )
-RETURNING *;
+RETURNING id, email, created_at, updated_at;
 
 -- name: ResetUser :exec
 DELETE FROM users;
+
+-- name: LoginUser :one
+SELECT email, password
+FROM users
+WHERE email=$1;
+
+-- name: GetUserByEmail :one
+SELECT id, email, created_at, updated_at
+FROM users
+WHERE email=$1;

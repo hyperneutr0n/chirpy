@@ -7,25 +7,84 @@ package database
 
 import (
 	"context"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email)
+INSERT INTO users (email, password)
 VALUES (
-    $1
+    $1,
+    $2
 )
 RETURNING id, email, created_at, updated_at
 `
 
-func (q *Queries) CreateUser(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, email)
-	var i User
+type CreateUserParams struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type CreateUserRow struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
+	row := q.db.QueryRowContext(ctx, createUser, arg.Email, arg.Password)
+	var i CreateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, email, created_at, updated_at
+FROM users
+WHERE email=$1
+`
+
+type GetUserByEmailRow struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i GetUserByEmailRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const loginUser = `-- name: LoginUser :one
+SELECT email, password
+FROM users
+WHERE email=$1
+`
+
+type LoginUserRow struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func (q *Queries) LoginUser(ctx context.Context, email string) (LoginUserRow, error) {
+	row := q.db.QueryRowContext(ctx, loginUser, email)
+	var i LoginUserRow
+	err := row.Scan(&i.Email, &i.Password)
 	return i, err
 }
 
