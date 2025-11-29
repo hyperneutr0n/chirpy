@@ -28,12 +28,15 @@ func main() {
 	}
 	dbQueries := database.New(db)
 
-	mux := http.NewServeMux()
+	secret := os.Getenv("SECRET")
+
 	apiCfg := &apiConfig{
 		fsHit: atomic.Int32{},
 		db: dbQueries,
+		secret: secret,
 	}
 
+	mux := http.NewServeMux()
 	fs := http.FileServer(http.Dir(filePathRoot))
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", fs)))
 

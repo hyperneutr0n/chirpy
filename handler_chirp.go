@@ -9,21 +9,35 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/hyperneutr0n/chirpy/internal/auth"
 	"github.com/hyperneutr0n/chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
+	bearer, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("error when getting bearer token from header: %v", err)
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	log.Println(bearer)
+	loggedInUserID, err := auth.ValidateJWT(bearer, cfg.secret)
+	if err != nil {
+		log.Printf("error when validating bearer token: %v", err)
+		sendError(w, http.StatusUnauthorized, "Invalid bearer token")
+		return
+	}
+
 	type request struct {
 		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	req := request{}
-	err := decoder.Decode(&req)
+	err = decoder.Decode(&req)
 	if err != nil {
 		log.Printf("error reading body: %v", err)
-		sendError(w, 500, "Failed creating user")
+		sendError(w, 500, "Failed creating chirp")
 		return
 	}
 
@@ -42,7 +56,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 
 	newChirp := database.CreateChirpParams{
 		Body:   strings.Join(words, " "),
-		UserID: req.UserID,
+		UserID: loggedInUserID,
 	}
 	chirp, err := cfg.db.CreateChirp(r.Context(), newChirp)
 	if err != nil {
