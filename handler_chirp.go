@@ -20,7 +20,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	log.Println(bearer)
+	
 	loggedInUserID, err := auth.ValidateJWT(bearer, cfg.secret)
 	if err != nil {
 		log.Printf("error when validating bearer token: %v", err)

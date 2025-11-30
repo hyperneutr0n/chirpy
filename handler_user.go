@@ -135,7 +135,7 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 
 	tokenRecord, err := cfg.db.GetRefreshToken(r.Context(), refreshToken)
 	if err != nil {
-		log.Printf("error getting refresh token: %v, %v", err, refreshToken)
+		log.Printf("error getting refresh token: %v", err)
 		sendError(w, http.StatusInternalServerError, "Internal server error")
 		return
 	}
@@ -180,4 +180,52 @@ func (cfg *apiConfig) handlerRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendJSON(w, http.StatusNoContent, nil)
+}
+
+func (cfg *apiConfig) handlerUpdateUser(w http.ResponseWriter, r *http.Request) {
+	bearer, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("error when getting bearer token from header: %v", err)
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	loggedInUserID, err := auth.ValidateJWT(bearer, cfg.secret)
+	if err != nil {
+		log.Printf("error when validating bearer token: %v", err)
+		sendError(w, http.StatusUnauthorized, "Invalid bearer token")
+		return
+	}
+
+	type request struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	req := request{}
+	err = decoder.Decode(&req)
+	if err != nil {
+		log.Printf("error reading body: %v", err)
+		sendError(w, 400, "Invalid request body")
+		return
+	}
+
+	password, err := auth.HashPasword(req.Password)
+	if err != nil {
+		log.Printf("error when trying to hash password %v", err)
+	}
+
+	user, err := cfg.db.UpdateUser(r.Context(), database.UpdateUserParams{
+		Email:    req.Email,
+		Password: password,
+		ID:       loggedInUserID,
+	})
+	if err != nil {
+		log.Printf("error creating user: %v", err)
+		sendError(w, 500, "Failed creating user")
+		return
+	}
+
+	sendJSON(w, 200, user)
 }

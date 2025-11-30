@@ -27,3 +27,11 @@ WHERE id=(
     FROM refresh_tokens 
     WHERE token=$1
     );
+
+-- name: UpdateUser :one
+UPDATE users
+SET 
+    email=$1,
+    password=$2
+WHERE id=$3
+RETURNING id, email, created_at, updated_at;
