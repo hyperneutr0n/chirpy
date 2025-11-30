@@ -14,11 +14,12 @@ import (
 const DefaultExpiresIn = 1 * time.Hour
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Token     string    `json:"token"`
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
@@ -56,9 +57,8 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type request struct {
-		Email            string `json:"email"`
-		Password         string `json:"password"`
-		ExpiresInSeconds int    `json:"expires_in_seconds"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -96,23 +96,88 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expiresIn := DefaultExpiresIn
-	if req.ExpiresInSeconds < 0 || req.ExpiresInSeconds > 3600 {
-		expiresIn = time.Duration(req.ExpiresInSeconds)
-	}
-
-	token, err := auth.MakeJWT(loggedInUser.ID, cfg.secret, expiresIn)
+	token, err := auth.MakeJWT(loggedInUser.ID, cfg.secret, DefaultExpiresIn)
 	if err != nil {
 		log.Printf("error when creating jwt: %v", err)
 		sendError(w, 500, "Internal server error")
 		return
 	}
 
-	sendJSON(w, 200, User{
-		ID:        loggedInUser.ID,
-		Email:     loggedInUser.Email,
-		CreatedAt: loggedInUser.CreatedAt,
-		UpdatedAt: loggedInUser.UpdatedAt,
-		Token:     token,
+	refreshToken, _ := auth.MakeRefreshToken()
+	_refreshToken, err := cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    loggedInUser.ID,
+		ExpiresAt: time.Now().Add(60 * 24 * time.Hour).UTC(),
 	})
+	if err != nil {
+		log.Printf("error when creating refresh token: %v", err)
+		sendError(w, 500, "Internal server error")
+		return
+	}
+
+	sendJSON(w, 200, User{
+		ID:           loggedInUser.ID,
+		Email:        loggedInUser.Email,
+		CreatedAt:    loggedInUser.CreatedAt,
+		UpdatedAt:    loggedInUser.UpdatedAt,
+		Token:        token,
+		RefreshToken: _refreshToken.Token,
+	})
+}
+
+func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
+	refreshToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("error getting refresh token from header: %v", err)
+		sendError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	tokenRecord, err := cfg.db.GetRefreshToken(r.Context(), refreshToken)
+	if err != nil {
+		log.Printf("error getting refresh token: %v, %v", err, refreshToken)
+		sendError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	if time.Now().UTC().After(tokenRecord.ExpiresAt) {
+		sendError(w, http.StatusUnauthorized, "Refresh token expired")
+		return
+	}
+
+	if tokenRecord.RevokedAt.Valid {
+		sendError(w, http.StatusUnauthorized, "Refresh token revoked")
+		return
+	}
+
+	token, err := auth.MakeJWT(tokenRecord.UserID, cfg.secret, DefaultExpiresIn)
+	if err != nil {
+		log.Printf("error creating jwt: %v", err)
+		sendError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	sendJSON(w, http.StatusOK, struct {
+		Token string `json:"token"`
+	}{
+		Token: token,
+	})
+}
+
+func (cfg *apiConfig) handlerRevoke(w http.ResponseWriter, r *http.Request) {
+	refreshToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("error getting refresh token from header: %v", err)
+		sendError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	err = cfg.db.RevokeRefreshToken(r.Context(), refreshToken)
+	if err != nil {
+		log.Printf("error when revoking refresh token: %v", err)
+		sendError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	sendJSON(w, http.StatusNoContent, nil)
 }
