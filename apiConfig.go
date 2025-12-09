@@ -7,7 +7,8 @@ import (
 )
 
 type apiConfig struct {
-	fsHit	atomic.Int32
-	db		*database.Queries
-	secret	string
+	fsHit    atomic.Int32
+	db       *database.Queries
+	secret   string
+	polkaKey string
 }

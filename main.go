@@ -30,10 +30,13 @@ func main() {
 
 	secret := os.Getenv("SECRET")
 
+	polkaKey := os.Getenv("POLKA_KEY")
+
 	apiCfg := &apiConfig{
-		fsHit: atomic.Int32{},
-		db: dbQueries,
-		secret: secret,
+		fsHit:    atomic.Int32{},
+		db:       dbQueries,
+		secret:   secret,
+		polkaKey: polkaKey,
 	}
 
 	mux := http.NewServeMux()
@@ -67,4 +70,3 @@ func main() {
 	log.Printf("Starting server on port: %v\n", port)
 	log.Fatal(server.ListenAndServe())
 }
-
