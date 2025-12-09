@@ -14,13 +14,14 @@ func sendJSON(w http.ResponseWriter, code int, payload any) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	_, err = w.Write(data)
-	if err != nil {
-		log.Printf("error when marshalling response: %v", err)
-		return
+	if code != http.StatusNoContent {
+		_, err = w.Write(data)
+		if err != nil {
+			log.Printf("error when writing response: %v", err)
+			return
+		}
 	}
 }
-
 
 func sendError(w http.ResponseWriter, code int, message string) {
 	type respJson struct {
@@ -39,7 +40,7 @@ func sendError(w http.ResponseWriter, code int, message string) {
 	w.WriteHeader(code)
 	_, err = w.Write(data)
 	if err != nil {
-		log.Printf("error when marshalling response: %v", err)
+		log.Printf("error when writing response: %v", err)
 		return
 	}
 }

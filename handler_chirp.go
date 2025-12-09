@@ -144,5 +144,5 @@ func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	sendJSON(w, 204, "")
+	sendJSON(w, http.StatusNoContent, "")
 }

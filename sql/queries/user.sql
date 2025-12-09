@@ -4,7 +4,7 @@ VALUES (
     $1,
     $2
 )
-RETURNING id, email, created_at, updated_at;
+RETURNING id, email, is_chirpy_red, created_at, updated_at;
 
 -- name: ResetUser :exec
 DELETE FROM users;
@@ -15,7 +15,7 @@ FROM users
 WHERE email=$1;
 
 -- name: GetUserByEmail :one
-SELECT id, email, created_at, updated_at
+SELECT id, email, is_chirpy_red, created_at, updated_at
 FROM users
 WHERE email=$1;
 
@@ -34,4 +34,9 @@ SET
     email=$1,
     password=$2
 WHERE id=$3
-RETURNING id, email, created_at, updated_at;
+RETURNING id, email, is_chirpy_red, created_at, updated_at;
+
+-- name: UpgradeUser :exec
+UPDATE users
+SET is_chirpy_red=true
+WHERE id=$1;

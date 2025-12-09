@@ -16,6 +16,7 @@ const DefaultExpiresIn = 1 * time.Hour
 type User struct {
 	ID           uuid.UUID `json:"id"`
 	Email        string    `json:"email"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	Token        string    `json:"token"`
@@ -118,6 +119,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, 200, User{
 		ID:           loggedInUser.ID,
 		Email:        loggedInUser.Email,
+		IsChirpyRed:  loggedInUser.IsChirpyRed,
 		CreatedAt:    loggedInUser.CreatedAt,
 		UpdatedAt:    loggedInUser.UpdatedAt,
 		Token:        token,
