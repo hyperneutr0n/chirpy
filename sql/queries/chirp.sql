@@ -7,7 +7,12 @@ VALUES (
 RETURNING *;
 
 -- name: GetChirps :many
-SELECT * FROM chirps ORDER BY created_at;
+SELECT * FROM chirps
+WHERE 
+    (user_id = sqlc.narg('user_id') OR sqlc.narg('user_id') IS NULL)
+ORDER BY 
+    CASE WHEN @sort_dir::text = 'desc' THEN created_at END DESC,
+    CASE WHEN @sort_dir::text != 'desc' THEN created_at END ASC;
 
 -- name: FindChirp :one
 SELECT * FROM chirps WHERE id=$1;

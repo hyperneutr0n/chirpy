@@ -29,7 +29,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	}
 
 	type request struct {
-		Body   string    `json:"body"`
+		Body string `json:"body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -69,13 +69,30 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, err := cfg.db.GetChirps(r.Context())
+	authorIDQuery := r.URL.Query().Get("author_id")
+	sortDirQuery := r.URL.Query().Get("sort")
+
+	var authorID uuid.NullUUID
+	if authorIDQuery != "" {
+		id, err := uuid.Parse(authorIDQuery)
+		if err == nil {
+			authorID = uuid.NullUUID{UUID: id, Valid: true}
+		}
+	}
+
+	chirps, err := cfg.db.GetChirps(r.Context(), database.GetChirpsParams{
+		UserID: authorID,
+		SortDir: sortDirQuery,
+	})
 	if err != nil {
 		log.Printf("error retrieving chirps: %v", err)
 		sendError(w, 500, "Failed retrieving chirps")
 		return
 	}
 
+	if chirps == nil {
+		chirps = []database.Chirp{}
+	}
 	sendJSON(w, 200, chirps)
 }
 
@@ -116,7 +133,7 @@ func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request)
 		sendError(w, http.StatusUnauthorized, "Invalid bearer token")
 		return
 	}
-	
+
 	chirpID := r.PathValue("chirpID")
 	_chirpID, err := uuid.Parse(chirpID)
 	if err != nil {
