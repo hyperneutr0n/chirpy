@@ -1,0 +1,33 @@
+services:
+  chirpy:
+    build: .
+    ports:
+      - "80:8080"
+    restart: on-failure
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DB_URL=postgres://chirpy:chirpy@db:5432/chirpy?sslmode=disable
+
+  db:
+    image: postgres:16-alpine
+    restart: always
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=chirpy
+      - POSTGRES_PASSWORD=chirpy
+      - POSTGRES_DB=chirpy
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chirpy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db-data:

@@ -27,7 +27,7 @@ func main() {
 	const port = "8080"
 
 	if err := godotenv.Load(); err != nil {
-		log.Fatal(err)
+		log.Printf("No env file found")
 	}
 
 	dbUrl := os.Getenv("DB_URL")
