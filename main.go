@@ -1,17 +1,26 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync/atomic"
+	"syscall"
+	"time"
+	"embed"
 
+	"github.com/pressly/goose/v3"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
 	"github.com/hyperneutr0n/chirpy/internal/database"
 )
+
+//go:embed sql/schema/*.sql
+var embedMigrations embed.FS
 
 func main() {
 	const filePathRoot = "app"
@@ -26,6 +35,24 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
+
+	if err := goose.SetDialect("postgres"); err != nil {
+        log.Fatal(err)
+    }
+
+    goose.SetBaseFS(embedMigrations)
+
+    log.Println("Running database migrations...")
+    if err := goose.Up(db, "sql/schema"); err != nil {
+        log.Fatalf("Error running migrations: %v", err)
+    }
+    log.Println("Migrations completed successfully!")
+
 	dbQueries := database.New(db)
 
 	secret := os.Getenv("SECRET")
@@ -67,6 +94,25 @@ func main() {
 		Handler: mux,
 	}
 
-	log.Printf("Starting server on port: %v\n", port)
-	log.Fatal(server.ListenAndServe())
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("Starting Chirpy on port: %v\n", port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v\n", err)
+		}
+	}()
+
+	<-stop
+	log.Println("Shutting down Chirpy...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("Shutdown failed: %v", err)
+	}
+
+	log.Println("Chirpy exited cleanly.")
 }
