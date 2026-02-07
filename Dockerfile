@@ -29,4 +29,6 @@ COPY --from=builder /bin/chirpy /chirpy
 
 USER chirpyuser:chirpyuser
 
+EXPOSE 8080
+
 ENTRYPOINT [ "/chirpy" ]
