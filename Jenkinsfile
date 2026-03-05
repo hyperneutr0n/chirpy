@@ -1,0 +1,58 @@
+pipeline {
+    agent any
+    
+    environment {
+        IMAGE_NAME = 'registry.gitlab.com/hyperneutr0n/chirpy' 
+        
+        REPO_URL = 'https://github.com/hyperneutr0n/chirpy.git'
+        
+        REGISTRY_URL = 'registry.gitlab.com'
+        DOCKER_CREDS = 'gitlab-container-registry-auth'
+        GITHUB_CREDS = 'github-private-auth'
+        KUBECONFIG_ID = 'k3s-kubeconfig'
+        
+        NAMESPACE = 'chirpy'
+        DEPLOYMENT_NAME = 'chirpy-api'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git credentialsId: "${GITHUB_CREDS}", url: "${REPO_URL}", branch: 'main'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'go test ./...'
+            }
+        }
+
+        stage('Build & Push Image') {
+            when { buildingTag() }
+            steps {
+                script {
+                    docker.withRegistry("https://${REGISTRY_URL}", "${DOCKER_CREDS}") {
+                        def customImage = docker.build("${IMAGE_NAME}:${TAG_NAME}")
+                        
+                        customImage.push()
+                        
+                        customImage.push("latest")
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to K3s') {
+            when { buildingTag() }
+            steps {
+                withKubeConfig([credentialsId: "${KUBECONFIG_ID}"]) {
+                    
+                    sh "kubectl set image deployment/${DEPLOYMENT_NAME} ${DEPLOYMENT_NAME}=${IMAGE_NAME}:${TAG_NAME} -n ${NAMESPACE}"
+                    
+                    sh "kubectl rollout status deployment/${DEPLOYMENT_NAME} -n ${NAMESPACE}"
+                }
+            }
+        }
+    }
+}
