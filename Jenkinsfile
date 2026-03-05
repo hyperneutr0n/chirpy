@@ -28,6 +28,13 @@ pipeline {
             }
         }
 
+        stage('Debug Info') {
+            steps {
+                echo "TAG_NAME is: ${env.TAG_NAME}"
+                echo "GIT_BRANCH is: ${env.GIT_BRANCH}"
+            }
+        }
+        
         stage('Build & Push Image') {
             when { buildingTag() }
             steps {
