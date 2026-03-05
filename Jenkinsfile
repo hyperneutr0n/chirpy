@@ -41,6 +41,8 @@ pipeline {
              }
             steps {
                 script {
+                    def ACTUAL_TAG = env.GIT_BRANCH.split('/').last()
+
                     docker.withRegistry("https://${REGISTRY_URL}", "${DOCKER_CREDS}") {
                         def customImage = docker.build("${IMAGE_NAME}:${TAG_NAME}")
                         
@@ -53,8 +55,12 @@ pipeline {
         }
 
         stage('Deploy to K3s') {
-            when { buildingTag() }
+            when { 
+                expression { return env.GIT_BRANCH?.contains('tags/') }
+             }
             steps {
+                def ACTUAL_TAG = env.GIT_BRANCH.split('/').last()
+                
                 withKubeConfig([credentialsId: "${KUBECONFIG_ID}"]) {
                     
                     sh "kubectl set image deployment/${DEPLOYMENT_NAME} ${DEPLOYMENT_NAME}=${IMAGE_NAME}:${TAG_NAME} -n ${NAMESPACE}"
