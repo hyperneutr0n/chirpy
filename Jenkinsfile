@@ -34,9 +34,11 @@ pipeline {
                 echo "GIT_BRANCH is: ${env.GIT_BRANCH}"
             }
         }
-        
+
         stage('Build & Push Image') {
-            when { buildingTag() }
+            when { 
+                expression { return env.GIT_BRANCH?.contains('tags/') }
+             }
             steps {
                 script {
                     docker.withRegistry("https://${REGISTRY_URL}", "${DOCKER_CREDS}") {
